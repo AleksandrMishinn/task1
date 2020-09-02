@@ -39,7 +39,6 @@ public class Test {
                     synchronized (taskLeft) {
                         taskLeft--;
                     }
-
                 } catch (TestException e) {
                     LOGGER.warning("Ошибка в вычислениях. Обрабатываемое число: " + currentNumber);
                     for (Thread currentThread : threads) {
