@@ -11,73 +11,42 @@ import java.util.logging.Logger;
  * остановить). Количество потоков должно быть ограничено значением константы com.company.TestConsts#MAX_THREADS.
  */
 public class Test {
-
-    private static volatile Integer tasksLeft = TestConsts.N;
+    private static volatile int tasksLeft = TestConsts.N;
+    private static Set<Double> result = new HashSet<>();
     final static Logger LOGGER = Logger.getLogger(Test.class.getName());
 
-    public static void main(String[] args) {
-
-        Set<Double> result = new HashSet<>();
-        List<Thread> threads = new ArrayList<>();
-
-        final Runnable executor = () -> {
-            while (tasksLeft > 0) {
-                if (Thread.interrupted()) {
-                    break;
-                }
-
-                Integer currentNumber = TestConsts.N - tasksLeft;
-
-                try {
-                    Set<Double> currentResult = TestCalc.calculate(currentNumber);
-                    synchronized (result) {
-                        result.addAll(currentResult);
-                    }
-                } catch (TestException e) {
-                    LOGGER.warning("Ошибка в вычислениях. Обрабатываемое число: " + currentNumber);
-                    breakAllThreads(threads);
-                }
-
-                synchronized (tasksLeft) {
-                    tasksLeft--;
-                }
-            }
-        };
-
-        createThreads(executor, threads);
+    public static void main(String[] args) throws InterruptedException {
+        Thread[] threads = createThreads();
         startThreads(threads);
-        waitAllThreads(threads);
-
+        waitExecutorsThreads(threads);
         LOGGER.info(String.valueOf(result));
     }
 
-    private static void breakAllThreads(List<Thread> threads) {
-        for (Thread currentThread : threads) {
-            currentThread.interrupt();
-        }
+    static synchronized int getNumberOfTasks() {
+        return tasksLeft--;
     }
 
-    private static void createThreads(Runnable executor, List<Thread> threads) {
-        for (int i = 0; i < TestConsts.MAX_THREADS; i++) {
-            Thread currentThread = new Thread(executor);
-            threads.add(currentThread);
-        }
+    static synchronized void setResult(Set<Double> threadsResult) {
+        result.addAll(threadsResult);
     }
 
-    private static void waitAllThreads(List<Thread> threads) {
-        for (Thread currentThread : threads) {
-            try {
-                currentThread.join();
-            } catch (InterruptedException e) {
-                LOGGER.warning("Ошибка в одном при исполнении потока " + currentThread);
-                System.exit(-1);
-            }
+    private static Thread[] createThreads() {
+        Thread[] threads = new Thread[TestConsts.MAX_THREADS];
+        for (int i = 0; i < threads.length; i++) {
+            threads[i] = new Thread(new Executor());
         }
+        return threads;
     }
 
-    private static void startThreads(List<Thread> threads) {
+    private static void startThreads(Thread[] threads) {
         for (Thread currentThread : threads) {
             currentThread.start();
+        }
+    }
+
+    private static void waitExecutorsThreads(Thread[] threads) throws InterruptedException {
+        for (Thread currentThread : threads) {
+            currentThread.join();
         }
     }
 }
