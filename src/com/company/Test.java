@@ -12,8 +12,7 @@ import java.util.logging.Logger;
  */
 public class Test {
 
-    private static volatile boolean allTasksCompleted = false;
-    private static volatile Queue<Integer> taskQueue = new LinkedList<>();
+    private static volatile Integer taskLeft = TestConsts.N;
     final static Logger LOGGER = Logger.getLogger(Test.class.getName());
 
     public static void main(String[] args) {
@@ -22,16 +21,29 @@ public class Test {
         List<Thread> threads = new ArrayList<>();
 
         final Runnable executor = () -> {
-            while (!(Test.allTasksCompleted && taskQueue.isEmpty())) {
-                Integer currentNumber = taskQueue.poll();
-                if (currentNumber != null) {
-                    try {
-                        Set<Double> currentResult = TestCalc.calculate(currentNumber);
+
+            while (taskLeft > 0) {
+
+                if (Thread.interrupted()) {
+                    break;
+                }
+
+                int currentNumber = TestConsts.N - taskLeft;
+
+                try {
+                    Set<Double> currentResult = TestCalc.calculate(currentNumber);
+
+                    synchronized (result) {
                         result.addAll(currentResult);
-                    } catch (TestException e) {
-                        LOGGER.warning("Ошибка в вычислениях. Обрабатываемое число: " + currentNumber);
-                        e.printStackTrace();
-                        break;
+                    }
+                    synchronized (taskLeft) {
+                        taskLeft--;
+                    }
+
+                } catch (TestException e) {
+                    LOGGER.warning("Ошибка в вычислениях. Обрабатываемое число: " + currentNumber);
+                    for (Thread currentThread : threads) {
+                        currentThread.interrupt();
                     }
                 }
             }
@@ -43,18 +55,12 @@ public class Test {
             currentThread.start();
         }
 
-        for (int i = 0; i < TestConsts.N; i++) {
-            taskQueue.add(i);
-        }
-
-        allTasksCompleted = true;
-
         for (Thread currentThread : threads) {
             try {
                 currentThread.join();
             } catch (InterruptedException e) {
                 LOGGER.warning("Ошибка в одном при исполнении потока " + currentThread);
-                e.printStackTrace();
+                System.exit(-1);
             }
         }
         LOGGER.info(String.valueOf(result));
