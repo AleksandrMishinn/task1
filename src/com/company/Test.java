@@ -12,7 +12,7 @@ import java.util.logging.Logger;
  */
 public class Test {
 
-    private static volatile Integer taskLeft = TestConsts.N;
+    private static volatile Integer tasksLeft = TestConsts.N;
     final static Logger LOGGER = Logger.getLogger(Test.class.getName());
 
     public static void main(String[] args) {
@@ -21,39 +21,50 @@ public class Test {
         List<Thread> threads = new ArrayList<>();
 
         final Runnable executor = () -> {
-
-            while (taskLeft > 0) {
-
+            while (tasksLeft > 0) {
                 if (Thread.interrupted()) {
                     break;
                 }
 
-                int currentNumber = TestConsts.N - taskLeft;
+                Integer currentNumber = TestConsts.N - tasksLeft;
 
                 try {
                     Set<Double> currentResult = TestCalc.calculate(currentNumber);
-
                     synchronized (result) {
                         result.addAll(currentResult);
                     }
-                    synchronized (taskLeft) {
-                        taskLeft--;
-                    }
                 } catch (TestException e) {
                     LOGGER.warning("Ошибка в вычислениях. Обрабатываемое число: " + currentNumber);
-                    for (Thread currentThread : threads) {
-                        currentThread.interrupt();
-                    }
+                    breakAllThreads(threads);
+                }
+
+                synchronized (tasksLeft) {
+                    tasksLeft--;
                 }
             }
         };
 
+        createThreads(executor, threads);
+        startThreads(threads);
+        waitAllThreads(threads);
+
+        LOGGER.info(String.valueOf(result));
+    }
+
+    private static void breakAllThreads(List<Thread> threads) {
+        for (Thread currentThread : threads) {
+            currentThread.interrupt();
+        }
+    }
+
+    private static void createThreads(Runnable executor, List<Thread> threads) {
         for (int i = 0; i < TestConsts.MAX_THREADS; i++) {
             Thread currentThread = new Thread(executor);
             threads.add(currentThread);
-            currentThread.start();
         }
+    }
 
+    private static void waitAllThreads(List<Thread> threads) {
         for (Thread currentThread : threads) {
             try {
                 currentThread.join();
@@ -62,6 +73,11 @@ public class Test {
                 System.exit(-1);
             }
         }
-        LOGGER.info(String.valueOf(result));
+    }
+
+    private static void startThreads(List<Thread> threads) {
+        for (Thread currentThread : threads) {
+            currentThread.start();
+        }
     }
 }
